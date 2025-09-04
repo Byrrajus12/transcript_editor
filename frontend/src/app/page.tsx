@@ -40,6 +40,29 @@ export default function Page() {
   const onTimeUpdate = useCallback((t: number) => setCurrentTime(t), []);
   const isPlaying = !!wsRef.current?.isPlaying();
 
+  // Drag-and-drop handlers for audio
+  const handleAudioDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const handleAudioDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleAudio(file);
+  };
+  // Drag-and-drop handlers for transcript
+  const handleTranscriptDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const handleTranscriptDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleTranscript(file);
+  };
+
   return (
     <main className="p-6 max-w-7xl mx-auto space-y-6" >
       <h1 className="text-2xl text-center font-semibold">Transcript Editor</h1>
@@ -47,7 +70,11 @@ export default function Page() {
       {/* AUDIO PANEL */}
       <div className="bg-white rounded-lg shadow-md p-4">
         {!audioFile ? (
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition">
+          <label
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition"
+            onDragOver={handleAudioDragOver}
+            onDrop={handleAudioDrop}
+          >
             <input
               type="file"
               accept="audio/*"
@@ -55,7 +82,7 @@ export default function Page() {
               onChange={(e) => handleAudio(e.target.files?.[0])}
             />
             <span className="text-sm text-gray-600">
-              <span className="font-semibold">Click to upload</span> or drag and drop audio
+              <span className="font-semibold">Click to upload</span> or <span className="font-semibold">Drag and drop</span> audio
             </span>
           </label>
         ) : (
@@ -77,7 +104,11 @@ export default function Page() {
       {/* TRANSCRIPT PANEL */}
       <div className="bg-white rounded-lg shadow-md p-4 relative">
         {!segments.length ? (
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition">
+          <label
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition"
+            onDragOver={handleTranscriptDragOver}
+            onDrop={handleTranscriptDrop}
+          >
             <input
               type="file"
               accept=".txt"
@@ -85,7 +116,7 @@ export default function Page() {
               onChange={(e) => handleTranscript(e.target.files?.[0])}
             />
             <span className="text-sm text-gray-600">
-              <span className="font-semibold">Click to upload</span> or drag and drop transcript
+              <span className="font-semibold">Click to upload</span> or <span className="font-semibold">Drag and drop</span> transcript
             </span>
           </label>
         ) : (
