@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { useCallback } from "react";
 import Waveform from "@/components/Waveform";
 import TranscriptEditor from "@/components/TranscriptEditor";
 import { parseTranscript, Segment } from "@/lib/parseTranscript";
@@ -20,9 +21,11 @@ export default function Page() {
   const [currentTime, setCurrentTime] = useState(0);
   const wsRef = useRef<WaveSurfer | null>(null);
 
-  const onWaveReady = (ws: WaveSurfer) => (wsRef.current = ws);
+  const onWaveReady = useCallback((ws: WaveSurfer) => {
+    wsRef.current = ws;
+  }, []);
 
-  const handleAudio = (f?: File) => setAudioFile(f ?? null);
+  const handleAudio = useCallback((f?: File) => setAudioFile(f ?? null), []);
 
   const handleTranscript = async (f?: File) => {
     if (!f) return setSegments([]);
@@ -30,8 +33,9 @@ export default function Page() {
     setSegments(parseTranscript(text));
   };
 
-  const handleSeek = (t: number) => wsRef.current?.setTime(t);
-  const handlePlayPause = () => wsRef.current?.playPause();
+  const handleSeek = useCallback((t: number) => wsRef.current?.setTime(t), []);
+  const handlePlayPause = useCallback(() => wsRef.current?.playPause(), []);
+  const onTimeUpdate = useCallback((t: number) => setCurrentTime(t), []);
   const isPlaying = !!wsRef.current?.isPlaying();
 
   return (
@@ -61,7 +65,7 @@ export default function Page() {
               <Waveform
                 file={audioFile}
                 onReadyAction={onWaveReady}
-                onTimeUpdateAction={(t) => setCurrentTime(t)}
+                onTimeUpdateAction={onTimeUpdate}
               />
             </div>
           </div>

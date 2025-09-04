@@ -29,7 +29,7 @@ export default function Waveform({ file, onReadyAction, onTimeUpdateAction }: Pr
     ws.on("ready", () => onReadyAction?.(ws));
     ws.on("timeupdate", (t) => onTimeUpdateAction?.(t));
     return () => ws.destroy();
-  }, []);
+  }, [onReadyAction, onTimeUpdateAction]);
 
   useEffect(() => {
     const ws = wsRef.current;
