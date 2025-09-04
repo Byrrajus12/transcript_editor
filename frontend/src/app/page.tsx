@@ -1,103 +1,125 @@
-import Image from "next/image";
+"use client";
+import { useRef, useState } from "react";
+import Waveform from "@/components/Waveform";
+import TranscriptEditor from "@/components/TranscriptEditor";
+import { parseTranscript, Segment } from "@/lib/parseTranscript";
+import { exportTXT, exportDOCX, exportPDF } from "@/lib/exporters";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Download, Play, Pause } from "lucide-react";
+import type WaveSurfer from "wavesurfer.js";
 
-export default function Home() {
+export default function Page() {
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
+  const wsRef = useRef<WaveSurfer | null>(null);
+
+  const onWaveReady = (ws: WaveSurfer) => (wsRef.current = ws);
+
+  const handleAudio = (f?: File) => setAudioFile(f ?? null);
+
+  const handleTranscript = async (f?: File) => {
+    if (!f) return setSegments([]);
+    const text = await f.text();
+    setSegments(parseTranscript(text));
+  };
+
+  const handleSeek = (t: number) => wsRef.current?.setTime(t);
+  const handlePlayPause = () => wsRef.current?.playPause();
+  const isPlaying = !!wsRef.current?.isPlaying();
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="p-6 max-w-7xl mx-auto space-y-6" >
+      <h1 className="text-2xl text-center font-semibold">Transcript Editor</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* AUDIO PANEL */}
+      <div className="bg-white rounded-lg shadow-md p-4">
+        {!audioFile ? (
+          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition">
+            <input
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={(e) => handleAudio(e.target.files?.[0])}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            <span className="text-sm text-gray-600">
+              <span className="font-semibold">Click to upload</span> or drag and drop audio
+            </span>
+          </label>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={handlePlayPause} size="sm">
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            </Button>
+            <div className="flex-1">
+              <Waveform
+                file={audioFile}
+                onReadyAction={onWaveReady}
+                onTimeUpdateAction={(t) => setCurrentTime(t)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* TRANSCRIPT PANEL */}
+      <div className="bg-white rounded-lg shadow-md p-4 relative">
+        {!segments.length ? (
+          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition">
+            <input
+              type="file"
+              accept=".txt"
+              className="hidden"
+              onChange={(e) => handleTranscript(e.target.files?.[0])}
+            />
+            <span className="text-sm text-gray-600">
+              <span className="font-semibold">Click to upload</span> or drag and drop transcript
+            </span>
+          </label>
+        ) : (
+          <>
+            {/* Header with Export Dropdown */}
+            <div className="flex justify-between items-center border-b">
+              <div className="mb-1">
+                <h2 className="text-lg font-medium">Transcript</h2>
+                <p className="text-sm text-gray-500">
+                  Click a segment to jump in audio
+                </p>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Download className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => exportTXT(segments)}>
+                    Download as .txt
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportDOCX(segments)}>
+                    Download as .docx
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportPDF(segments)}>
+                    Download as .pdf
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <TranscriptEditor
+              segments={segments}
+              currentTime={currentTime}
+              onChangeAction={setSegments}
+              onSeekAction={handleSeek}
+            />
+          </>
+        )}
+      </div>
+    </main>
   );
 }
