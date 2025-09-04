@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Download, Play, Pause } from "lucide-react";
 import type WaveSurfer from "wavesurfer.js";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Page() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
+  const [withTimestamps, setWithTimestamps] = useState(false);
   const wsRef = useRef<WaveSurfer | null>(null);
 
   const onWaveReady = useCallback((ws: WaveSurfer) => {
@@ -103,13 +105,24 @@ export default function Page() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={() => exportTXT(segments)}>
+                  <div className="flex items-center gap-2 px-2 py-2 text-xs border-b">
+                    <Checkbox
+                      id="timestamps"
+                      checked={withTimestamps}
+                      onCheckedChange={val => setWithTimestamps(val === true)}
+                      className="size-4"
+                    />
+                    <label htmlFor="timestamps" className="cursor-pointer select-none">
+                      Include timestamps
+                    </label>
+                  </div>
+                  <DropdownMenuItem onClick={() => exportTXT(segments, "transcript.txt", withTimestamps)}>
                     Download as .txt
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportDOCX(segments)}>
+                  <DropdownMenuItem onClick={() => exportDOCX(segments, "transcript.docx", withTimestamps)}>
                     Download as .docx
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportPDF(segments)}>
+                  <DropdownMenuItem onClick={() => exportPDF(segments, "transcript.pdf", withTimestamps)}>
                     Download as .pdf
                   </DropdownMenuItem>
                 </DropdownMenuContent>
