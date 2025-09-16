@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import shutil
 import uuid
+import torch
 
 app = FastAPI()
 
@@ -29,9 +30,15 @@ async def transcribe_audio(file: UploadFile = File(...)):
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        print("GPU available:", torch.cuda.is_available())
+        if torch.cuda.is_available():
+            print("GPU name:", torch.cuda.get_device_name(0))
+        else:
+            print("Running on CPU")
+            
         # Transcription logic
-        device = "cpu"
-        compute_type = "int8"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        compute_type = "float16" if device == "cuda" else "int8"
         model = whisperx.load_model("large-v2", device, compute_type=compute_type)
         audio = whisperx.load_audio(upload_path)
         result = model.transcribe(audio, batch_size=4)
@@ -65,3 +72,10 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/debug/gpu")
+async def check_gpu():
+    return {
+        "cuda_available": torch.cuda.is_available(),
+        "device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    }
