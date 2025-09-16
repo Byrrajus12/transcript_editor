@@ -1,4 +1,5 @@
 steps:
+  # Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', '-t',
@@ -6,11 +7,7 @@ steps:
       '.'
     ]
 
-images:
-  - 'us-central1-docker.pkg.dev/transcript-tool-472219/whisperx-repo/whisperx'
-
-# Deploy automatically to Cloud Run after build
-steps:
+  # Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
@@ -24,5 +21,8 @@ steps:
         "--cpu", "4",
         "--gpu", "1"
       ]
+
+images:
+  - 'us-central1-docker.pkg.dev/transcript-tool-472219/whisperx-repo/whisperx'
 
 timeout: 2400s
