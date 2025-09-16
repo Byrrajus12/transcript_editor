@@ -1,13 +1,13 @@
 steps:
-  # Build Docker image
+  # Step 1: Build lightweight app image using Dockerfile
   - name: 'gcr.io/cloud-builders/docker'
     args: [
-      'build', '-t',
-      'us-central1-docker.pkg.dev/transcript-tool-472219/whisperx-repo/whisperx',
+      'build', '-f', 'Dockerfile',
+      '-t', 'us-central1-docker.pkg.dev/transcript-tool-472219/whisperx-repo/whisperx',
       '.'
     ]
 
-  # Deploy to Cloud Run
+  # Step 2: Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:

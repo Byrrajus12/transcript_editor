@@ -1,0 +1,19 @@
+# Dockerfile.base
+FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Python deps
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+        torch torchaudio \
+        whisperx \
+        transformers==4.37.2 \
+        pyannote.audio==3.1.1 \
+        fastapi uvicorn[standard] \
+        ffmpeg-python
