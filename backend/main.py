@@ -39,7 +39,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
         # Transcription logic
         device = "cuda" if torch.cuda.is_available() else "cpu"
         compute_type = "float16" if device == "cuda" else "int8"
-        model = whisperx.load_model("large-v2", device, compute_type=compute_type)
+        model = whisperx.load_model("medium", device, compute_type=compute_type)
         audio = whisperx.load_audio(upload_path)
         result = model.transcribe(audio, batch_size=4)
 
