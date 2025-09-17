@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { useCallback } from "react";
 import Waveform from "@/components/Waveform";
 import TranscriptEditor from "@/components/TranscriptEditor";
-import { parseTranscript, Segment } from "@/lib/parseTranscript";
+import { Segment } from "@/lib/parseTranscript";
 import { exportTXT, exportDOCX, exportPDF } from "@/lib/exporters";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,25 +15,67 @@ import {
 import { Download, Play, Pause } from "lucide-react";
 import type WaveSurfer from "wavesurfer.js";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2 } from "lucide-react";
 
 export default function Page() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [withTimestamps, setWithTimestamps] = useState(false);
+  const [loading, setLoading] = useState(false);
   const wsRef = useRef<WaveSurfer | null>(null);
 
   const onWaveReady = useCallback((ws: WaveSurfer) => {
     wsRef.current = ws;
   }, []);
 
-  const handleAudio = useCallback((f?: File) => setAudioFile(f ?? null), []);
+  // Upload audio file, send to backend, get transcript
+  // Helper to convert HH:MM:SS.sss to seconds
+  function timeStrToSeconds(str: string): number {
+    const [h, m, s] = str.split(":");
+    const [sec, ms = "0"] = s.split(".");
+    return (
+      Number(h) * 3600 +
+      Number(m) * 60 +
+      Number(sec) +
+      (ms ? Number("0." + ms) : 0)
+    );
+  }
 
-  const handleTranscript = async (f?: File) => {
-    if (!f) return setSegments([]);
-    const text = await f.text();
-    setSegments(parseTranscript(text));
-  };
+  const handleAudio = useCallback(async (f?: File) => {
+    setAudioFile(f ?? null);
+    setSegments([]);
+    if (!f) return;
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", f);
+      const res = await fetch("https://app-772741460830.us-central1.run.app/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to transcribe audio");
+      const data = await res.json();
+      if (Array.isArray(data.segments)) {
+        // Convert start/end to numbers and add a unique key
+        setSegments(
+          data.segments.map((seg: { speaker: string; start: string; end: string; text: string }, idx: number) => ({
+            ...seg,
+            start: timeStrToSeconds(seg.start),
+            end: timeStrToSeconds(seg.end),
+            id: `${seg.speaker}-${seg.start}-${seg.end}-${idx}`,
+          }))
+        );
+      } else {
+        throw new Error("Invalid response from backend");
+      }
+    } catch (err) {
+      setSegments([]);
+      alert("Error: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleSeek = useCallback((t: number) => wsRef.current?.setTime(t), []);
   const handlePlayPause = useCallback(() => wsRef.current?.playPause(), []);
@@ -51,25 +93,20 @@ export default function Page() {
     const file = e.dataTransfer.files?.[0];
     if (file) handleAudio(file);
   };
-  // Drag-and-drop handlers for transcript
-  const handleTranscriptDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  const handleTranscriptDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleTranscript(file);
-  };
+
 
   return (
     <main className="p-6 max-w-7xl mx-auto space-y-6" >
-      <h1 className="text-2xl text-center font-semibold">Transcript Editor</h1>
-
+  <div className="rounded-lg shadow-md p-4" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
+        <h1 className="text-2xl text-center font-semibold">Transcript Editor</h1>
+      </div>
       {/* AUDIO PANEL */}
-      <div className="bg-white rounded-lg shadow-md p-4">
-        {!audioFile ? (
+  <div className="rounded-lg shadow-md p-4" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center w-full h-32 text-gray-500">
+            <span className="text-sm animate-pulse"><Loader2 className="mr-2 h-4 w-4 animate-spin inline" />Transcribing audio</span>
+          </div>
+        ) : !audioFile ? (
           <label
             className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition"
             onDragOver={handleAudioDragOver}
@@ -102,33 +139,17 @@ export default function Page() {
       </div>
 
       {/* TRANSCRIPT PANEL */}
-      <div className="bg-white rounded-lg shadow-md p-4 relative">
-        {!segments.length ? (
-          <label
-            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition"
-            onDragOver={handleTranscriptDragOver}
-            onDrop={handleTranscriptDrop}
-          >
-            <input
-              type="file"
-              accept=".txt"
-              className="hidden"
-              onChange={(e) => handleTranscript(e.target.files?.[0])}
-            />
-            <span className="text-sm text-gray-600">
-              <span className="font-semibold">Click to upload</span> or <span className="font-semibold">Drag and drop</span> transcript
-            </span>
-          </label>
-        ) : (
-          <>
-            {/* Header with Export Dropdown */}
-            <div className="flex justify-between items-center border-b">
-              <div className="mb-1">
-                <h2 className="text-lg font-medium">Transcript</h2>
-                <p className="text-sm text-gray-500">
-                  Click a segment to jump in audio
-                </p>
-              </div>
+      {audioFile && !loading && segments.length > 0 && (
+        <div className="rounded-lg shadow-md p-4 relative" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
+          {/* Header with Export Dropdown and Re-upload */}
+          <div className="flex justify-between items-center border-b">
+            <div className="mb-1">
+              <h2 className="text-lg font-medium">Transcript</h2>
+              <p className="text-sm text-gray-500">
+                Click a segment to jump in audio
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -159,15 +180,15 @@ export default function Page() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <TranscriptEditor
-              segments={segments}
-              currentTime={currentTime}
-              onChangeAction={setSegments}
-              onSeekAction={handleSeek}
-            />
-          </>
-        )}
-      </div>
+          </div>
+          <TranscriptEditor
+            segments={segments}
+            currentTime={currentTime}
+            onChangeAction={setSegments}
+            onSeekAction={handleSeek}
+          />
+        </div>
+      )}
     </main>
   );
 }
