@@ -16,7 +16,7 @@ export default function Page() {
       <div className="rounded-lg shadow-md p-4 mb-2" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
         <h1 className="text-2xl text-center font-semibold">Transcript Editor</h1>
         <div className="mt-4">
-          <div className="inline-flex p-2 gap-2 rounded-md outline outline-1 outline-gray-300 mx-auto w-max">
+          <div className="inline-flex flex-wrap p-2 gap-2 rounded-md outline outline-1 outline-gray-300 mx-auto w-max max-w-full">
             <Button
               variant={tab === "v2" ? "default" : "outline"}
               onClick={() => setTab("v2")}
