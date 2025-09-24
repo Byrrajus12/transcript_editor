@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Play, Pause, Loader2, Trash } from "lucide-react";
+import { Download, Play, Pause, Loader2, Trash, TriangleAlert } from "lucide-react";
 import type WaveSurfer from "wavesurfer.js";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress"
@@ -208,10 +208,16 @@ const handleAudio = useCallback(async (f?: File) => {
         {status !== 'idle' ? (
           <div className="flex flex-col items-center justify-center w-full h-32 text-gray-500">
             {status === 'starting' && (
-              <span className="text-sm animate-pulse">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                Waiting for Backend...
-              </span>
+              <>
+                <span className="text-sm animate-pulse">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                  Waiting for Backend...
+                </span>
+                <div className="flex items-center mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded px-2 py-1 text-xs">
+                  <TriangleAlert className="w-4 h-4 mr-1 text-yellow-500" />
+                  Could take a couple of minutes. Please keep the page open.
+                </div>
+              </>
             )}
             {status === 'uploading' && (
               <>
@@ -222,10 +228,16 @@ const handleAudio = useCallback(async (f?: File) => {
               </>
             )}
             {status === 'transcribing' && (
-              <span className="text-sm animate-pulse">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                Transcribing audio...
-              </span>
+              <>
+                <span className="text-sm animate-pulse">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                  Transcribing audio...
+                </span>
+                <div className="flex items-center mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded px-2 py-1 text-xs">
+                  <TriangleAlert className="w-4 h-4 mr-1 text-yellow-500" />
+                  Could take a couple of minutes. Please keep page open, and only run one transcription at a time.
+                </div>
+              </>
             )}
           </div>
         ) : !audioFile ? (
