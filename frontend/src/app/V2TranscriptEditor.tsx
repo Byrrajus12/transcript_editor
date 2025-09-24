@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import Waveform from "@/components/Waveform";
 import TranscriptEditor from "@/components/TranscriptEditor";
 import { Segment } from "@/lib/parseTranscript";
@@ -11,18 +11,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Play, Pause, Loader2 } from "lucide-react";
+import { Download, Play, Pause, Loader2, Trash } from "lucide-react";
 import type WaveSurfer from "wavesurfer.js";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress"
+import { v4 as uuidv4 } from "uuid"; 
+
+interface TranscriptHistoryItem {
+  sessionId: string;
+  filename: string;
+  segments: Segment[];
+  createdAt: number;
+}
 
 export default function V2TranscriptEditor() {
+  // Helper to format date
+  const formatDate = (ts: number) => {
+    const d = new Date(ts);
+    return d.toLocaleString();
+  };
+
+  // Delete transcript from history
+  const handleDeleteHistory = useCallback((sessionId: string) => {
+    setHistory((prev: TranscriptHistoryItem[]) => {
+      const updated = prev.filter((h: TranscriptHistoryItem) => h.sessionId !== sessionId);
+      localStorage.setItem("transcriptHistory", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [withTimestamps, setWithTimestamps] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // status: 'idle' | 'starting' | 'uploading' | 'transcribing'
+  const [status, setStatus] = useState<'idle' | 'starting' | 'uploading' | 'transcribing'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const wsRef = useRef<WaveSurfer | null>(null);
+  const [history, setHistory] = useState<TranscriptHistoryItem[]>([]);
 
+  useEffect(() => {
+  const stored = JSON.parse(localStorage.getItem("transcriptHistory") || "[]");
+  setHistory(stored);
+}, []);
+  
   const onWaveReady = useCallback((ws: WaveSurfer) => {
     wsRef.current = ws;
   }, []);
@@ -38,42 +69,122 @@ export default function V2TranscriptEditor() {
     );
   }
 
-  const handleAudio = useCallback(async (f?: File) => {
-    setAudioFile(f ?? null);
-    setSegments([]);
-    if (!f) return;
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", f);
-      const res = await fetch("https://app-772741460830.us-central1.run.app/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Failed to transcribe audio");
-      const data = await res.json();
-      if (Array.isArray(data.segments)) {
-        setSegments(
-          data.segments.map((seg: { speaker: string; start: string; end: string; text: string }, idx: number) => ({
-            ...seg,
-            start: timeStrToSeconds(seg.start),
-            end: timeStrToSeconds(seg.end),
-            id: `${seg.speaker}-${seg.start}-${seg.end}-${idx}`,
-          }))
-        );
-      } else {
-        throw new Error("Invalid response from backend");
-      }
-    } catch (err) {
-      setSegments([]);
-      alert("Error: " + (err instanceof Error ? err.message : "Unknown error"));
-    } finally {
-      setLoading(false);
+  // progress-aware uploader
+  function uploadFileWithProgress(
+    url: string,
+    file: File,
+    onProgress: (pct: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url, true);
+      xhr.setRequestHeader("Content-Type", file.type);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const pct = Math.round((event.loaded / event.total) * 100);
+          onProgress(pct);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload error"));
+      xhr.send(file);
+    });
+  }
+
+
+
+const handleAudio = useCallback(async (f?: File) => {
+  if (!f) return;
+
+  const sessionId = uuidv4();
+  const activeSessionId = sessionId;
+  setAudioFile(f);
+  setSegments([]);
+  setUploadProgress(0);
+  setStatus('starting');
+
+  // 1. Get signed URL
+  const filename = `uploads/${Date.now()}-${f.name}`;
+  const res1 = await fetch(
+    "https://app-772741460830.us-central1.run.app/api/gcs-upload-url",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, contentType: f.type }),
     }
-  }, []);
+  );
+  if (!res1.ok) {
+    alert("Failed to get upload URL.");
+    setStatus('idle');
+    return;
+  }
+  const { url, publicUrl } = await res1.json();
+
+  try {
+    // 2. Upload with progress
+    setStatus('uploading');
+    await uploadFileWithProgress(url, f, (pct) => setUploadProgress(pct));
+
+    // 3. Process audio
+    setStatus('transcribing');
+    const res2 = await fetch(
+      "https://app-772741460830.us-central1.run.app/api/process-gcs-audio",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gcsUrl: publicUrl, sessionId }),
+      }
+    );
+    if (!res2.ok) throw new Error("Failed to transcribe audio");
+    const data = await res2.json();
+
+    // Ignore stale responses
+    if (activeSessionId !== sessionId) return;
+
+    if (Array.isArray(data.segments)) {
+      const parsed = data.segments.map(
+        (
+          seg: { speaker: string; start: string; end: string; text: string },
+          idx: number
+        ) => ({
+          ...seg,
+          start: timeStrToSeconds(seg.start),
+          end: timeStrToSeconds(seg.end),
+          id: `${seg.speaker}-${seg.start}-${seg.end}-${idx}`,
+        })
+      );
+      setSegments(parsed);
+
+      // Save transcript to localStorage (for Option 2)
+      const history = JSON.parse(localStorage.getItem("transcriptHistory") || "[]");
+      history.push({ sessionId, filename: f.name, segments: parsed, createdAt: Date.now() });
+      localStorage.setItem("transcriptHistory", JSON.stringify(history));
+    }
+  } catch (err) {
+    alert("Error: " + (err instanceof Error ? err.message : "Unknown error"));
+  } finally {
+    if (activeSessionId === sessionId) {
+      setStatus('idle');
+      setUploadProgress(0);
+    }
+  }
+}, []);
+
 
   const handleSeek = useCallback((t: number) => wsRef.current?.setTime(t), []);
-  const handlePlayPause = useCallback(() => wsRef.current?.playPause(), []);
+  const handlePlayPause = useCallback(
+    () => wsRef.current?.playPause(),
+    []
+  );
   const onTimeUpdate = useCallback((t: number) => setCurrentTime(t), []);
   const isPlaying = !!wsRef.current?.isPlaying();
 
@@ -90,10 +201,32 @@ export default function V2TranscriptEditor() {
 
   return (
     <>
-      <div className="rounded-lg shadow-md p-4" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
-        {loading ? (
+      <div
+        className="rounded-lg shadow-md p-4"
+        style={{ backgroundColor: "hsl(0 0% 98%)" }}
+      >
+        {status !== 'idle' ? (
           <div className="flex flex-col items-center justify-center w-full h-32 text-gray-500">
-            <span className="text-sm animate-pulse"><Loader2 className="mr-2 h-4 w-4 animate-spin inline" />Transcribing audio</span>
+            {status === 'starting' && (
+              <span className="text-sm animate-pulse">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                Waiting for Backend...
+              </span>
+            )}
+            {status === 'uploading' && (
+              <>
+                <span className="text-xs mb-2 text-gray-500 tracking-wide font-medium">
+                  Uploading audio... {uploadProgress}%
+                </span>
+                <Progress value={uploadProgress} className="w-full h-3 rounded-lg" />
+              </>
+            )}
+            {status === 'transcribing' && (
+              <span className="text-sm animate-pulse">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                Transcribing audio...
+              </span>
+            )}
           </div>
         ) : !audioFile ? (
           <label
@@ -108,13 +241,18 @@ export default function V2TranscriptEditor() {
               onChange={(e) => handleAudio(e.target.files?.[0])}
             />
             <span className="text-sm text-gray-600">
-              <span className="font-semibold">Click to upload</span> or <span className="font-semibold">Drag and drop</span> audio
+              <span className="font-semibold">Click to upload</span> or{" "}
+              <span className="font-semibold">Drag and drop</span> audio
             </span>
           </label>
         ) : (
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={handlePlayPause} size="sm">
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {isPlaying ? (
+                <Pause className="w-5 h-5" />
+              ) : (
+                <Play className="w-5 h-5" />
+              )}
             </Button>
             <div className="flex-1">
               <Waveform
@@ -126,8 +264,12 @@ export default function V2TranscriptEditor() {
           </div>
         )}
       </div>
-      {audioFile && !loading && segments.length > 0 && (
-        <div className="rounded-lg shadow-md p-4 relative" style={{ backgroundColor: 'hsl(0 0% 98%)' }}>
+
+  {audioFile && status === 'idle' && segments.length > 0 && (
+        <div
+          className="rounded-lg shadow-md p-4 relative"
+          style={{ backgroundColor: "hsl(0 0% 98%)" }}
+        >
           <div className="flex justify-between items-center border-b">
             <div className="mb-1">
               <h2 className="text-lg font-medium">Transcript</h2>
@@ -147,20 +289,37 @@ export default function V2TranscriptEditor() {
                     <Checkbox
                       id="timestamps"
                       checked={withTimestamps}
-                      onCheckedChange={val => setWithTimestamps(val === true)}
+                      onCheckedChange={(val) =>
+                        setWithTimestamps(val === true)
+                      }
                       className="size-4"
                     />
-                    <label htmlFor="timestamps" className="cursor-pointer select-none">
+                    <label
+                      htmlFor="timestamps"
+                      className="cursor-pointer select-none"
+                    >
                       Include timestamps
                     </label>
                   </div>
-                  <DropdownMenuItem onClick={() => exportTXT(segments, "transcript.txt", withTimestamps)}>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      exportTXT(segments, "transcript.txt", withTimestamps)
+                    }
+                  >
                     Download as .txt
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportDOCX(segments, "transcript.docx", withTimestamps)}>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      exportDOCX(segments, "transcript.docx", withTimestamps)
+                    }
+                  >
                     Download as .docx
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportPDF(segments, "transcript.pdf", withTimestamps)}>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      exportPDF(segments, "transcript.pdf", withTimestamps)
+                    }
+                  >
                     Download as .pdf
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -173,6 +332,73 @@ export default function V2TranscriptEditor() {
             onChangeAction={setSegments}
             onSeekAction={handleSeek}
           />
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div className="mt-4 p-2 border rounded-lg bg-white">
+          <h3 className="font-medium mb-1 p-2">Previous transcripts</h3>
+          <ul className="space-y-1 border-t border-gray-200 p-2">
+            {history.map((h) => (
+              <li key={h.sessionId} className="flex justify-between items-center border-b p-2 border-gray-200 ">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{h.filename}</span>
+                  <span className="text-xs text-gray-400">{formatDate(h.createdAt)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Download className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <div className="flex items-center gap-2 px-2 py-2 text-xs border-b">
+                        <Checkbox
+                          id={`timestamps-${h.sessionId}`}
+                          checked={withTimestamps}
+                          onCheckedChange={(val) =>
+                            setWithTimestamps(val === true)
+                          }
+                          className="size-4"
+                        />
+                        <label
+                          htmlFor={`timestamps-${h.sessionId}`}
+                          className="cursor-pointer select-none"
+                        >
+                          Include timestamps
+                        </label>
+                      </div>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportTXT(h.segments, `${h.filename}.txt`, withTimestamps)
+                        }
+                      >
+                        Download as .txt
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportDOCX(h.segments, `${h.filename}.docx`, withTimestamps)
+                        }
+                      >
+                        Download as .docx
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportPDF(h.segments, `${h.filename}.pdf`, withTimestamps)
+                        }
+                      >
+                        Download as .pdf
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteHistory(h.sessionId)} aria-label="Delete transcript">
+                    <Trash className="h-5 w-5 text-red-500 hover:text-red-700" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </>
