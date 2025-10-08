@@ -16,7 +16,7 @@ import type WaveSurfer from "wavesurfer.js";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function V1TranscriptEditor() {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioFile, setAudioFile] = useState<string | File | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [withTimestamps, setWithTimestamps] = useState(false);
