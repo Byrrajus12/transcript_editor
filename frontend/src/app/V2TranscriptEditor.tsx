@@ -433,6 +433,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { v4 as uuidv4 } from "uuid"
 import Notification from "@/components/Notification"
+import type { SerializedEditorState, SerializedLexicalNode } from "lexical";
 
 interface TranscriptHistoryItem {
   session_id: string
@@ -444,6 +445,10 @@ interface TranscriptHistoryItem {
 interface NotificationState {
   message: string
   type: "success" | "error" | "info"
+}
+
+interface RichSegment extends Segment {
+  rich_text?: SerializedEditorState<SerializedLexicalNode> | null;
 }
 
 const API_BASE = "https://app-772741460830.us-central1.run.app/api"
@@ -462,7 +467,7 @@ export default function V2TranscriptEditor() {
 
   const [audioFile, setAudioFile] = useState<string | File | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [segments, setSegments] = useState<Segment[]>([])
+  const [segments, setSegments] = useState<RichSegment[]>([]);
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [withTimestamps, setWithTimestamps] = useState(false)
