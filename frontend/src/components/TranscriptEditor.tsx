@@ -252,7 +252,6 @@ function renderRichPreview(
         const content = String(node.text || "");
         const fmt = Number(node.format ?? 0);
 
-        // Lexical bitmask flags
         const BOLD = 1;
         const ITALIC = 2;
         const STRIKETHROUGH = 8;
@@ -261,15 +260,9 @@ function renderRichPreview(
         const SUPERSCRIPT = 64;
         const HIGHLIGHT = 128;
 
-        // Start with raw text
         let html = content;
 
-        // Wrap in highlight first (so underline etc inside of mark)
-        if (fmt & HIGHLIGHT) {
-          html = `<mark style="background-color:#fde68a;">${html}</mark>`;
-        }
-        
-        // Other text styles
+        // Apply inline styles first
         if (fmt & BOLD) html = `<strong>${html}</strong>`;
         if (fmt & ITALIC) html = `<em>${html}</em>`;
         if (fmt & STRIKETHROUGH) html = `<s>${html}</s>`;
@@ -277,18 +270,22 @@ function renderRichPreview(
         if (fmt & SUBSCRIPT) html = `<sub>${html}</sub>`;
         if (fmt & SUPERSCRIPT) html = `<sup>${html}</sup>`;
 
-        // Color: only if node has explicit style or class marker
+        // Detect color from node.style
         let color: string | null = null;
         if (typeof node.style === "string") {
           const m = node.style.match(/color:\s*([^;]+)/);
           if (m) color = m[1].trim();
         } else if (typeof node.classNames === "string") {
-          // if your toolbar sets classNames like "text-red-500"
           if (node.classNames.includes("text-red-500")) color = "#ef4444";
           if (node.classNames.includes("text-blue-500")) color = "#3b82f6";
         }
-        if (color) {
-          html = `<span style="color:${color};">${html}</span>`;
+
+        // Apply color (inner)
+        if (color) html = `<span style="color:${color};">${html}</span>`;
+
+        // Apply highlight (outermost)
+        if (fmt & HIGHLIGHT) {
+          html = `<mark style="background-color:#fde68a;">${html}</mark>`;
         }
 
         return html;

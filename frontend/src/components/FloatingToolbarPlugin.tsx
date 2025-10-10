@@ -162,16 +162,17 @@ export default function FloatingToolbarPlugin() {
   if (!coords) return null;
 
   const toggleFormat = (
-    style: "bold" | "italic" | "highlight" | "red" | "blue"
+    style: "bold" | "italic" | "highlight" | "black" | "red" | "blue"
   ) => {
     editor.update(() => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
         if (style === "highlight") {
           selection.formatText("highlight");
-        } else if (style === "red" || style === "blue") {
+        } else if (style === "red" || style === "blue" || style === "black") {
           // ✅ Proper color application (serializable)
-          const color = style === "red" ? "#ef4444" : "#3b82f6";
+          const color =
+            style === "red" ? "#020101ff" : style === "blue" ? "#3b82f6" : "#000000";
           $patchStyleText(selection, { color });
         } else {
           selection.formatText(style);
@@ -207,6 +208,12 @@ export default function FloatingToolbarPlugin() {
         onClick={() => toggleFormat("highlight")}
       >
         H
+      </button>
+      <button
+        className="px-2 py-1 rounded text-black hover:bg-gray-100"
+        onClick={() => toggleFormat("black")}
+      >
+        A
       </button>
       <button
         className="px-2 py-1 rounded text-red-500 hover:bg-gray-100"
