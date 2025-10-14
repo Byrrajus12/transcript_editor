@@ -476,6 +476,7 @@ export default function V2TranscriptEditor() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [currentFilename, setCurrentFilename] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [downloadingAudioId, setDownloadingAudioId] = useState<string | null>(null)
   const [history, setHistory] = useState<TranscriptHistoryItem[]>([])
 
   const wsRef = useRef<WaveSurfer | null>(null)
@@ -617,6 +618,7 @@ export default function V2TranscriptEditor() {
   }, [])
 
   const handleDownloadAudio = async (sessionId: string, filename?: string) => {
+    setDownloadingAudioId(sessionId);
     try {
       const res = await fetch(`${API_BASE}/download-audio/${sessionId}`);
       if (!res.ok) throw new Error("Failed to download audio");
@@ -637,6 +639,9 @@ export default function V2TranscriptEditor() {
       URL.revokeObjectURL(url);
     } catch (err) {
       showNotification(err instanceof Error ? err.message : "Download failed", "error");
+    }
+    finally {
+      setDownloadingAudioId(null);
     }
   };
 
@@ -932,8 +937,13 @@ const handleLoadTranscript = async (sessionId: string) => {
                     aria-label="Download audio"
                     title="Download Audio"
                     className="flex items-center gap-2 px-2"
+                    disabled={downloadingAudioId === h.session_id}
                   >
-                    <FileAudio2 className="h-5 w-5" />
+                    {downloadingAudioId === h.session_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileAudio2 className="h-5 w-5" />
+                    )}
                     <span className="hidden sm:inline text-xs text-gray-800">Download Audio</span>
                   </Button>
                   <DropdownMenu>
