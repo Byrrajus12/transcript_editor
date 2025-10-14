@@ -170,7 +170,7 @@ export default function FloatingToolbarPlugin() {
         if (style === "highlight") {
           selection.formatText("highlight");
         } else if (style === "red" || style === "blue" || style === "black") {
-          // ✅ Proper color application (serializable)
+          // Proper color application (serializable)
           const color =
             style === "red" ? "#ef4444" : style === "blue" ? "#3b82f6" : "#000000";
           $patchStyleText(selection, { color });

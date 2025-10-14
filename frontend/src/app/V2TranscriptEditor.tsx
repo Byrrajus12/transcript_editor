@@ -427,7 +427,7 @@ import type { Segment } from "@/lib/parseTranscript"
 import { exportTXT, exportDOCX, exportPDF } from "@/lib/exporters"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Download, Play, Pause, Loader2, Trash, TriangleAlert, Save, FolderOpen } from "lucide-react"
+import { Download, Play, Pause, Loader2, Trash, TriangleAlert, Save, FolderOpen, FileAudio2, FileDown} from "lucide-react"
 import type WaveSurfer from "wavesurfer.js"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
@@ -615,6 +615,31 @@ export default function V2TranscriptEditor() {
       setUploadProgress(0)
     }
   }, [])
+
+  const handleDownloadAudio = async (sessionId: string, filename?: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/download-audio/${sessionId}`);
+      if (!res.ok) throw new Error("Failed to download audio");
+
+      // Extract the real filename from Content-Disposition header
+      const disposition = res.headers.get("Content-Disposition");
+      let extractedFilename: string | null = null;
+      if (disposition && disposition.includes("filename=")) {
+        extractedFilename = disposition.split("filename=")[1].replace(/["']/g, "").trim();
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = extractedFilename || filename || `${sessionId}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showNotification(err instanceof Error ? err.message : "Download failed", "error");
+    }
+  };
+
 
 const handleLoadTranscript = async (sessionId: string) => {
   setStatus("loading");
@@ -900,10 +925,22 @@ const handleLoadTranscript = async (sessionId: string) => {
                   <span className="text-xs text-gray-400">{h.updated ? formatDate(h.updated) : "No date"}</span>
                 </button>
                 <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadAudio(h.session_id, h.filename)}
+                    aria-label="Download audio"
+                    title="Download Audio"
+                    className="flex items-center gap-2 px-2"
+                  >
+                    <FileAudio2 className="h-5 w-5" />
+                    <span className="hidden sm:inline text-xs text-gray-800">Download Audio</span>
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <Download className="h-5 w-5" />
+                      <Button variant="outline" size="sm" aria-label="Download Transcript" title="Download Transcript" className="flex items-center gap-2 px-2">
+                        <FileDown className="h-5 w-5" />
+                        <span className="hidden sm:inline text-xs text-gray-800">Download Transcript</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
@@ -948,10 +985,11 @@ const handleLoadTranscript = async (sessionId: string) => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
                     onClick={() => handleDeleteHistory(h.session_id)}
-                    aria-label="Delete transcript"
+                    aria-label="Delete Transcript and Audio" 
+                    title="Delete Transcript and Audio"
                   >
                     <Trash className="h-5 w-5 text-red-500 hover:text-red-700" />
                   </Button>
