@@ -172,7 +172,7 @@ export default function FloatingToolbarPlugin() {
         } else if (style === "red" || style === "blue" || style === "black") {
           // ✅ Proper color application (serializable)
           const color =
-            style === "red" ? "#020101ff" : style === "blue" ? "#3b82f6" : "#000000";
+            style === "red" ? "#ef4444" : style === "blue" ? "#3b82f6" : "#000000";
           $patchStyleText(selection, { color });
         } else {
           selection.formatText(style);
