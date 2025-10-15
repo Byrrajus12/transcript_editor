@@ -149,7 +149,6 @@ const LoadTextPlugin = () => {
 
         <RichTextPlugin
           contentEditable={<ContentEditable className="min-h-[60px] outline-none" />}
-          placeholder={<div className="text-gray-400">Type here…</div>}
           ErrorBoundary={() => null}
         />
         <HistoryPlugin />

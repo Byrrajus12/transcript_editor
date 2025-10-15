@@ -1,96 +1,12 @@
-// "use client";
-// import { useEffect, useMemo, useRef } from "react";
-// import type { Segment } from "@/lib/parseTranscript";
-// import { Input } from "@/components/ui/input";
-// import { cn } from "@/lib/utils";
-
-// type Props = {
-//   segments: Segment[];
-//   currentTime: number;
-//   onChangeAction: (segments: Segment[]) => void;
-//   onSeekAction: (t: number) => void;
-// };
-
-// export default function TranscriptEditor({
-//   segments,
-//   currentTime,
-//   onChangeAction,
-//   onSeekAction,
-// }: Props) {
-//   const containerRef = useRef<HTMLDivElement | null>(null);
-
-//   const activeId = useMemo(() => {
-//     const s = segments.find((x) => currentTime >= x.start && currentTime < x.end);
-//     return s?.id;
-//   }, [segments, currentTime]);
-
-//   useEffect(() => {
-//     if (!activeId || !containerRef.current) return;
-//     const el = containerRef.current.querySelector<HTMLDivElement>(`[data-id="${activeId}"]`);
-//     if (el) el.scrollIntoView({ block: "nearest" });
-//   }, [activeId]);
-
-//   const handleEdit = (id: string, field: "text" | "speaker", value: string) => {
-//     const next = segments.map((s) => (s.id === id ? { ...s, [field]: value } : s));
-//     onChangeAction(next);
-//   };
-
-//   return (
-//     <div ref={containerRef} className="max-h-[420px] overflow-auto p-3 space-y-3">
-//       {segments.map((s) => (
-//         <div
-//           key={s.id}
-//           data-id={s.id}
-//           onClick={() => onSeekAction(s.start)}
-//           className={cn(
-//             "p-3 rounded-md cursor-pointer space-y-2 border border-gray-200 bg-white shadow-sm",
-//             s.id === activeId && "border-sky-400 bg-sky-50"
-//           )}
-//         >
-//           <div className="flex items-center gap-2 text-xs text-gray-500">
-//             <Input
-//               value={s.speaker}
-//               onClick={(e) => e.stopPropagation()}
-//               onChange={(e) => handleEdit(s.id, "speaker", e.target.value)}
-//               className="w-28"
-//             />
-//             <span>
-//               [{fmt(s.start)} → {fmt(s.end)}]
-//             </span>
-//           </div>
-//           <textarea
-//             value={s.text}
-//             onClick={(e) => e.stopPropagation()}
-//             onChange={(e) => handleEdit(s.id, "text", e.target.value)}
-//             onInput={e => {
-//               const target = e.target as HTMLTextAreaElement;
-//               target.style.height = 'auto';
-//               target.style.height = target.scrollHeight + 'px';
-//             }}
-//             style={{ overflow: 'hidden' }}
-//             className="w-full bg-white text-sm border border-gray-200 rounded-md p-3 resize-none focus:outline-none focus:ring-1 focus:ring-sky-400"
-//           />
-//         </div>
-//       ))}
-//     </div>
-//   );
-// }
-
-// const fmt = (t: number) => {
-//   const hh = Math.floor(t / 3600);
-//   const mm = Math.floor((t % 3600) / 60);
-//   const ss = Math.floor(t % 60);
-//   const ms = Math.floor((t - Math.floor(t)) * 1000);
-//   const pad = (n: number, len = 2) => String(n).padStart(len, "0");
-//   return `${pad(hh)}:${pad(mm)}:${pad(ss)}.${String(ms).padStart(3, "0")}`;
-// };
-"use client";
-import { useRef, useMemo, useEffect, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { Segment } from "@/lib/parseTranscript";
 import type { SerializedEditorState, SerializedLexicalNode } from "lexical";
 import RichSegmentEditor from "@/components/RichSegmentEditor";
+import { useState, useMemo, useRef, useEffect } from "react";
 
 interface RichSegment extends Segment {
   rich_text?: SerializedEditorState<SerializedLexicalNode> | null;
@@ -103,10 +19,6 @@ interface Props {
   onSeekAction: (t: number) => void;
 }
 
-/**
- * TranscriptEditor — base segment list view with hybrid inline editing.
- * Click segment background to seek audio, click inside text to edit.
- */
 export default function TranscriptEditor({
   segments,
   currentTime,
@@ -117,24 +29,47 @@ export default function TranscriptEditor({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [richId, setRichId] = useState<string | null>(null);
 
-  // Identify currently active segment based on playback time
   const activeId = useMemo(() => {
     const s = segments.find((x) => currentTime >= x.start && currentTime < x.end);
     return s?.id;
   }, [segments, currentTime]);
 
-  // Scroll active segment into view
   useEffect(() => {
-    if (!activeId || !containerRef.current) return;
-    // 🚫 Don't auto-scroll while editing a text box
-    if (richId !== null) return;
-    const el = containerRef.current.querySelector<HTMLDivElement>(`[data-id="${activeId}"]`);
+    if (!activeId || !containerRef.current || richId) return;
+    const el = containerRef.current.querySelector<HTMLDivElement>(
+      `[data-id="${activeId}"]`
+    );
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [activeId, richId]);
 
-  // Update speaker or text field
-  const handleEdit = (id: string, field: "text" | "speaker", value: string): void => {
-    const next = segments.map((s) => (s.id === id ? { ...s, [field]: value } : s));
+  const handleEdit = (id: string, field: "text" | "speaker", value: string) => {
+    const next = segments.map((s) =>
+      s.id === id ? { ...s, [field]: value } : s
+    );
+    onChangeAction(next);
+  };
+
+  const handleDelete = (id: string) => {
+    const next = segments.filter((s) => s.id !== id);
+    onChangeAction(next);
+  };
+
+  const handleInsertBelow = (id: string) => {
+    const idx = segments.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const newSeg: RichSegment = {
+      id: uuidv4(),
+      speaker: "UNKNOWN",
+      start: 0,
+      end: 0,
+      text: "",
+      rich_text: null,
+    };
+    const next = [
+      ...segments.slice(0, idx + 1),
+      newSeg,
+      ...segments.slice(idx + 1),
+    ];
     onChangeAction(next);
   };
 
@@ -146,45 +81,67 @@ export default function TranscriptEditor({
           data-id={s.id}
           onClick={(e) => {
             const target = e.target as HTMLElement;
-            // Only trigger seek when clicking outside editor, toolbar, or input
             if (
               target.closest(".segment-editor") ||
               target.closest(".speaker-input") ||
               target.closest(".lexical-editor") ||
               target.closest(".floating-toolbar")
-            ) {
+            )
               return;
-            }
             onSeekAction(s.start);
             setFocusedId(s.id);
           }}
           className={cn(
-            "p-3 rounded-md cursor-pointer space-y-2 border border-gray-200 bg-white shadow-sm transition-all",
+            "group p-3 rounded-md cursor-pointer space-y-2 border border-gray-200 bg-white shadow-sm transition-all relative",
             s.id === activeId && "border-sky-400 bg-sky-50"
           )}
         >
-          {/* --- Speaker row --- */}
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Input
-              value={s.speaker}
-              onClick={(e) => e.stopPropagation()}
-              onFocus={() => setFocusedId(s.id)}
-              onChange={(e) => handleEdit(s.id, "speaker", e.target.value)}
-              className="w-28 speaker-input"
-            />
-            <span>
-              [{fmt(s.start)} → {fmt(s.end)}]
-            </span>
+          {/* --- top row: speaker + actions --- */}
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <Input
+                value={s.speaker}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={() => setFocusedId(s.id)}
+                onChange={(e) => handleEdit(s.id, "speaker", e.target.value)}
+                className="w-28 speaker-input"
+              />
+              <span>[{fmt(s.start)} → {fmt(s.end)}]</span>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleInsertBelow(s.id);
+                }}
+                title="Insert new segment below"
+              >
+                <Plus className="w-4 h-4 text-green-500" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(s.id);
+                }}
+                title="Delete segment"
+              >
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </Button>
+            </div>
           </div>
 
-          {/* --- Text row --- */}
+          {/* --- text area --- */}
           {richId === s.id ? (
             <RichSegmentEditor
               segment={s}
-              onCommit={(plainText, richJSON) => {
+              onCommit={(plain, richJSON) => {
                 const next = segments.map((seg) =>
                   seg.id === s.id
-                    ? { ...seg, text: plainText, rich_text: richJSON }
+                    ? { ...seg, text: plain, rich_text: richJSON }
                     : seg
                 );
                 onChangeAction(next);
@@ -198,23 +155,21 @@ export default function TranscriptEditor({
             />
           ) : (
             <div
-              className={cn(
-                "segment-editor border border-gray-200 rounded-md p-3 text-sm bg-white min-h-[60px] focus-within:ring-1 focus-within:ring-sky-400"
-              )}
+              className="segment-editor border border-gray-200 rounded-md p-3 text-sm bg-white min-h-[60px] hover:ring-1 hover:ring-sky-200"
               onClick={(e) => {
-                e.stopPropagation();
-                setRichId(s.id);
-                setFocusedId(s.id);
+              e.stopPropagation();
+              setRichId(s.id);
+              setFocusedId(s.id);
               }}
             >
               <div
-                className="whitespace-pre-wrap prose max-w-none text-sm"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    s.rich_text && typeof s.rich_text === "object"
-                      ? renderRichPreview(s.rich_text)
-                      : s.text || "Click to edit…",
-                }}
+              className="whitespace-pre-wrap prose max-w-none text-sm"
+              dangerouslySetInnerHTML={{
+                __html:
+                s.rich_text && typeof s.rich_text === "object"
+                  ? renderRichPreview(s.rich_text)
+                  : s.text || '<span class="text-gray-400">Click to edit…</span>',
+              }}
               />
             </div>
           )}
