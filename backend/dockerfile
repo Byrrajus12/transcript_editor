@@ -2,10 +2,10 @@ FROM us-central1-docker.pkg.dev/transcript-tool-472219/whisperx-repo/base:latest
 
 WORKDIR /app
 
-# Copy only code (requirements are already baked into base)
+# Copy code
 COPY . .
 
-# Allow setting HF token at build or runtime
+# Setting HF token at build or runtime
 ARG HF_TOKEN
 ENV HF_TOKEN=$HF_TOKEN
 
