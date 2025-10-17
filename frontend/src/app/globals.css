@@ -120,3 +120,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Autofill overrides (scoped via .no-autofill) */
+/* Targets Chrome / Edge / Safari (-webkit-) and Firefox (-moz-) */
+.no-autofill:-webkit-autofill,
+.no-autofill:-webkit-autofill:focus,
+.no-autofill:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--card-foreground) !important;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(255,255,255,0.06) inset !important;
+  box-shadow: 0 0 0px 1000px rgba(255,255,255,0.06) inset !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.no-autofill:-moz-autofill {
+  -moz-text-fill-color: var(--card-foreground) !important;
+  box-shadow: 0 0 0px 1000px rgba(255,255,255,0.06) inset !important;
+}
