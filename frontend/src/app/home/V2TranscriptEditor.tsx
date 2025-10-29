@@ -51,6 +51,8 @@ export default function V2TranscriptEditor() {
   const [segments, setSegments] = useState<RichSegment[]>([]);
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSpeedControl, setShowSpeedControl] = useState(false);
   const [withTimestamps, setWithTimestamps] = useState(false)
   const [status, setStatus] = useState<"idle" | "starting" | "uploading" | "transcribing" | "loading">("idle")
   const [uploadProgress, setUploadProgress] = useState<number>(0)
@@ -59,7 +61,8 @@ export default function V2TranscriptEditor() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [downloadingAudioId, setDownloadingAudioId] = useState<string | null>(null)
   const [history, setHistory] = useState<TranscriptHistoryItem[]>([])
-
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  
   const wsRef = useRef<WaveSurfer | null>(null)
 
   const formatTime = (seconds: number) => {
@@ -75,20 +78,38 @@ export default function V2TranscriptEditor() {
 
   const loadTranscriptHistory = async () => {
     try {
-      const res = await fetch(`${API_BASE}/transcripts`)
+      setLoadingHistory(true);
+      const res = await fetch(`${API_BASE}/transcripts`);
       if (res.ok) {
-        const data = await res.json()
-        setHistory(data.transcripts || [])
+        const data = await res.json();
+        setHistory(data.transcripts || []);
       }
     } catch (err) {
-      console.error("Failed to load transcript history:", err)
+      console.error("Failed to load transcript history:", err);
+    } finally {
+      setLoadingHistory(false);
     }
-  }
+  };
 
   const onWaveReady = useCallback((ws: WaveSurfer) => {
     wsRef.current = ws
     setDuration(ws.getDuration())
   }, [])
+
+  useEffect(() => {
+    if (wsRef.current) {
+      wsRef.current.setPlaybackRate(playbackRate);
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("playbackRate");
+    if (saved) setPlaybackRate(Number(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("playbackRate", playbackRate.toString());
+  }, [playbackRate]);
 
   function timeStrToSeconds(str: string): number {
     const [h, m, s] = str.split(":")
@@ -429,6 +450,102 @@ const handleLoadTranscript = async (sessionId: string) => {
                 {formatTime(duration)}
               </span>
             </div>
+            <div className="flex flex-col items-end mt-1 text-xs text-gray-600">
+              <button
+                onClick={() => setShowSpeedControl((s) => !s)}
+                className="flex items-center gap-1 text-gray-600 hover:text-gray-800 transition text-[11px] focus:outline-none"
+              >
+                <span>
+                  {showSpeedControl ? "Hide" : "Show"} Playback Controls
+                </span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={`w-3 h-3 transition-transform duration-200 ${
+                    showSpeedControl ? "rotate-180" : ""
+                  }`}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+
+              {/* Collapsible playback controls */}
+              <div
+                className={`transition-all duration-300 ease-out overflow-hidden ${
+                  showSpeedControl ? "max-h-20 opacity-100 mt-1" : "max-h-0 opacity-0"
+                }`}
+              >
+                <div className="flex items-center gap-3 text-xs text-gray-600 justify-end mt-1">
+                  <span className="font-mono tracking-tight text-gray-700">
+                    Playback Speed: {playbackRate.toFixed(2)}×
+                  </span>
+
+                  <div className="relative flex items-center justify-between w-44 select-none">
+                    <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-200 -translate-y-1/2"></div>
+
+                    {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
+                      <div
+                        key={r}
+                        className="z-10 h-[4px] w-[4px] rounded-full bg-gray-400 translate-y-[0.5px]"
+                        title={`${r.toFixed(2)}×`}
+                      />
+                    ))}
+
+                    {/* slider dot */}
+                    <input
+                      type="range"
+                      min="0.25"
+                      max="2"
+                      step="0.25"
+                      value={playbackRate}
+                      onChange={(e) => setPlaybackRate(Number(e.target.value))}
+                      className="absolute top-1/2 left-0 w-full h-3 -translate-y-[6px] appearance-none bg-transparent cursor-pointer z-20"
+                    />
+
+                    {/* Custom active dot visuals */}
+                    <style jsx>{`
+                      input[type='range']::-webkit-slider-thumb {
+                        appearance: none;
+                        height: 14px;
+                        width: 14px;
+                        border-radius: 50%;
+                        background-color: #0ea5e9;
+                        border: 2px solid white;
+                        box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+                        transition: transform 0.15s ease, box-shadow 0.15s ease;
+                        margin-top: -6px; /* lifts thumb above the line */
+                        position: relative;
+                        z-index: 30;
+                      }
+                      input[type='range']::-webkit-slider-thumb:hover {
+                        transform: scale(1.15);
+                        box-shadow: 0 0 4px rgba(14, 165, 233, 0.6);
+                      }
+                      input[type='range']::-moz-range-thumb {
+                        height: 14px;
+                        width: 14px;
+                        border-radius: 50%;
+                        background-color: #0ea5e9;
+                        border: 2px solid white;
+                        position: relative;
+                        z-index: 30;
+                      }
+                      input[type='range']::-webkit-slider-runnable-track {
+                        height: 1px;
+                        background: transparent;
+                      }
+                      input[type='range']::-moz-range-track {
+                        height: 1px;
+                        background: transparent;
+                      }
+                    `}</style>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -487,34 +604,94 @@ const handleLoadTranscript = async (sessionId: string) => {
         </div>
       )}
 
-      {history.length > 0 && (
-        <div className="mt-4 rounded-lg shadow-md bg-white">
+    <div className="relative mt-4">
+      {/* Placeholder loading*/}
+      <div
+        className={`absolute inset-0 transition-opacity duration-500 ${
+          loadingHistory ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="rounded-lg shadow-md bg-white">
           <div className="p-4 border-b bg-gray-50 rounded-t-lg">
             <h3 className="font-medium flex items-center gap-2">
               <FolderOpen className="w-5 h-5" />
               Previous Transcripts
             </h3>
           </div>
+
+          <div
+            className="overflow-y-auto custom-scrollbar"
+            style={{ maxHeight: "calc(90vh - 350px)" }}
+          >
+            <ul className="divide-y">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <li
+                  key={idx}
+                  className="flex justify-between items-center p-4 animate-pulse"
+                >
+                  <div className="flex flex-col items-start flex-1 text-left gap-2">
+                    <div className="h-4 w-40 bg-gray-200 rounded" />
+                    <div className="h-3 w-24 bg-gray-100 rounded" />
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <div className="h-8 w-[120px] bg-gray-200 rounded" />
+                    <div className="h-8 w-[150px] bg-gray-200 rounded" />
+                    <div className="h-8 w-8 bg-gray-200 rounded" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`transition-opacity duration-500 ${
+          loadingHistory ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        {history.length > 0 ? (
+          <div className="rounded-lg shadow-md bg-white">
+            <div className="p-4 border-b bg-gray-50 rounded-t-lg">
+              <h3 className="font-medium flex items-center gap-2">
+                <FolderOpen className="w-5 h-5" />
+                Previous Transcripts
+              </h3>
+            </div>
+
+          <div
+            className="overflow-y-auto custom-scrollbar"
+            style={{ maxHeight: "calc(90vh - 350px)" }}
+          >
           <ul className="divide-y">
             {history.map((h) => (
               <li
                 key={h.session_id}
                 className={`flex justify-between items-center p-4 hover:bg-gray-50 transition ${
-                  currentSessionId === h.session_id ? "bg-sky-50 border-l-4 border-sky-500" : ""
+                  currentSessionId === h.session_id
+                    ? "bg-sky-50 border-l-4 border-sky-500"
+                    : ""
                 }`}
               >
                 <button
                   onClick={() => handleLoadTranscript(h.session_id)}
                   className="flex flex-col items-start flex-1 text-left"
                 >
-                  <span className="text-sm font-medium text-gray-900">{h.filename || "Untitled"}</span>
-                  <span className="text-xs text-gray-400">{h.updated ? formatDate(h.updated) : "No date"}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {h.filename || "Untitled"}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {h.updated ? formatDate(h.updated) : "No date"}
+                  </span>
                 </button>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDownloadAudio(h.session_id, h.filename)}
+                    onClick={() =>
+                      handleDownloadAudio(h.session_id, h.filename)
+                    }
                     aria-label="Download audio"
                     title="Download Audio"
                     className="flex items-center gap-2 px-2"
@@ -525,13 +702,23 @@ const handleLoadTranscript = async (sessionId: string) => {
                     ) : (
                       <FileAudio2 className="h-5 w-5" />
                     )}
-                    <span className="hidden sm:inline text-xs text-gray-800">Download Audio</span>
+                    <span className="hidden sm:inline text-xs text-gray-800">
+                      Download Audio
+                    </span>
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" aria-label="Download Transcript" title="Download Transcript" className="flex items-center gap-2 px-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label="Download Transcript"
+                        title="Download Transcript"
+                        className="flex items-center gap-2 px-2"
+                      >
                         <FileDown className="h-5 w-5" />
-                        <span className="hidden sm:inline text-xs text-gray-800">Download Transcript</span>
+                        <span className="hidden sm:inline text-xs text-gray-800">
+                          Download Transcript
+                        </span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
@@ -539,36 +726,59 @@ const handleLoadTranscript = async (sessionId: string) => {
                         <Checkbox
                           id={`timestamps-${h.session_id}`}
                           checked={withTimestamps}
-                          onCheckedChange={(val) => setWithTimestamps(val === true)}
+                          onCheckedChange={(val) =>
+                            setWithTimestamps(val === true)
+                          }
                           className="size-4"
                         />
-                        <label htmlFor={`timestamps-${h.session_id}`} className="cursor-pointer select-none">
+                        <label
+                          htmlFor={`timestamps-${h.session_id}`}
+                          className="cursor-pointer select-none"
+                        >
                           Include timestamps
                         </label>
                       </div>
                       <DropdownMenuItem
                         onClick={async () => {
-                          const res = await fetch(`${API_BASE}/transcript/${h.session_id}`)
+                          const res = await fetch(
+                            `${API_BASE}/transcript/${h.session_id}`
+                          )
                           const data = await res.json()
-                          exportTXT(data.segments, `${h.filename}_transcribed.txt`, withTimestamps)
+                          exportTXT(
+                            data.segments,
+                            `${h.filename}_transcribed.txt`,
+                            withTimestamps
+                          )
                         }}
                       >
                         Download as .txt
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
-                          const res = await fetch(`${API_BASE}/transcript/${h.session_id}`)
+                          const res = await fetch(
+                            `${API_BASE}/transcript/${h.session_id}`
+                          )
                           const data = await res.json()
-                          exportDOCX(data.segments, `${h.filename}_transcribed.docx`, withTimestamps)
+                          exportDOCX(
+                            data.segments,
+                            `${h.filename}_transcribed.docx`,
+                            withTimestamps
+                          )
                         }}
                       >
                         Download as .docx
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
-                          const res = await fetch(`${API_BASE}/transcript/${h.session_id}`)
+                          const res = await fetch(
+                            `${API_BASE}/transcript/${h.session_id}`
+                          )
                           const data = await res.json()
-                          exportPDF(data.segments, `${h.filename}_transcribed.pdf`, withTimestamps)
+                          exportPDF(
+                            data.segments,
+                            `${h.filename}_transcribed.pdf`,
+                            withTimestamps
+                          )
                         }}
                       >
                         Download as .pdf
@@ -588,8 +798,24 @@ const handleLoadTranscript = async (sessionId: string) => {
               </li>
             ))}
           </ul>
+          </div>
+          </div>
+          ) : (
+            // Empty State
+            <div className="rounded-lg shadow-md bg-white">
+              <div className="p-4 border-b bg-gray-50 rounded-t-lg">
+                <h3 className="font-medium flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5" />
+                  Previous Transcripts
+                </h3>
+              </div>
+              <div className="p-6 text-sm text-gray-500 text-center">
+                No transcripts found.
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }
