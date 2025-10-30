@@ -1,7 +1,7 @@
-import Image from "next/image";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Background from "./Background";
 
 const geistSans = Geist({ 
   variable: "--font-geist-sans",
@@ -28,17 +28,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen`}
       >
-        <Image
-          src="/gradient-background.jpg"
-          alt="Background"
-          fill
-          priority
-          sizes="100vw"
-          style={{
-            objectFit: "cover",
-            zIndex: -1,
-          }}
-        />
+        <Background />
         <main className="relative z-10">{children}</main>
       </body>
     </html>
