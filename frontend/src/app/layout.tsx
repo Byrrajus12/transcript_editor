@@ -32,6 +32,7 @@ export default function RootLayout({
           src="/gradient-background.jpg"
           alt="Background"
           fill
+          priority
           sizes="100vw"
           style={{
             objectFit: "cover",

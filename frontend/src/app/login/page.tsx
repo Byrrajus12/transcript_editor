@@ -5,7 +5,6 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 // using native input/label elements in this layout
@@ -46,21 +45,8 @@ export default function LoginPage() {
 
 return (
  <div className="relative flex items-center justify-center min-h-screen p-4 overflow-hidden">
-      {/* Optimized background image */}
-      <Image
-        src="/gradient-background.jpg"
-        alt="Gradient background"
-        fill
-        loading="lazy" 
-        sizes="100vw"
-        style={{
-          objectFit: "cover",
-          objectPosition: "center",
-          zIndex: -2,
-        }}
-      />
-      {/* subtle overlay for contrast */}
-      <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px] z-[-1]" />
+      {/* subtle overlay for contrast - global background provided by layout.tsx */}
+      <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px] z-0" />
 
       {/* Floating glass orbs for visual interest */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
