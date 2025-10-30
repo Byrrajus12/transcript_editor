@@ -3,8 +3,9 @@
 import { supabase } from "@/utils/supabase"
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 // using native input/label elements in this layout
@@ -31,28 +32,35 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push("/home")
+      router.push("/")
     }
 
     setLoading(false)
   }
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      document.body.classList.add("loaded");
+    }
+  }, []);
+
 return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundImage: "url('/gradient-background.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
-      <div
-        className="absolute inset-0 opacity-0"
+ <div className="relative flex items-center justify-center min-h-screen p-4 overflow-hidden">
+      {/* Optimized background image */}
+      <Image
+        src="/gradient-background.jpg"
+        alt="Gradient background"
+        fill
+        loading="lazy" 
+        sizes="100vw"
         style={{
-          background: "rgba(0, 0, 0, 0.15)",
+          objectFit: "cover",
+          objectPosition: "center",
+          zIndex: -2,
         }}
-      ></div>
+      />
+      {/* subtle overlay for contrast */}
+      <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px] z-[-1]" />
 
       {/* Floating glass orbs for visual interest */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
