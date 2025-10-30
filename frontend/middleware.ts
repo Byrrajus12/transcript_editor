@@ -9,13 +9,20 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
+  const { pathname } = req.nextUrl
+
+  // Allow unauthenticated access to these paths
   const isPublic =
-    req.nextUrl.pathname.startsWith('/login') ||
-    req.nextUrl.pathname === '/favicon.ico' ||
-    req.nextUrl.pathname.startsWith('/_next')
+    pathname.startsWith('/login') ||
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.match(/\.(jpg|jpeg|png|gif|svg|ico|webp|mp4|mp3|woff2)$/)
 
   if (!isPublic && !session) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    const redirectUrl = new URL('/login', req.url)
+    redirectUrl.searchParams.set('redirectedFrom', pathname)
+    return NextResponse.redirect(redirectUrl)
   }
 
   return res
