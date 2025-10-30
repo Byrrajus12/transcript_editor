@@ -20,7 +20,7 @@ export default function Background() {
         fill
         priority
         sizes="100vw"
-        onLoadingComplete={() => setLoaded(true)}
+        onLoad={() => setLoaded(true)}
         style={{
           objectFit: "cover",
           zIndex: -1,
